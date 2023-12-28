@@ -1,14 +1,16 @@
 from multiprocessing import freeze_support
 import os
+import os.path
 import torch
 import torchvision
 from PIL import Image
 import torchvision.transforms as transforms
 import torch.nn as nn
 import torch.optim as optim
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Dataset
 from typing import Tuple
-    
+from torchvision.io import read_image
+
 SAVE_PATH = "weights.pth"
 batch_size = 10
 n_epochs = 100
@@ -22,6 +24,46 @@ preprocess = transforms.Compose([
     transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
 ])
 
+classes = {
+    "NORMAL": 0,
+    "DRUSEN": 1,
+    "CNV": 2,
+    "DME": 3
+}
+
+class CustomImageDataset(Dataset):
+    def __init__(self, folder_name, transform, train):
+        self.folder_name = folder_name
+        self.transform = transform
+        self.train = train
+        self.files = []
+        self.label_folders = []
+
+        if train == True:
+            self.folder_name = os.path.join(self.folder_name, "train", "train")
+        else:
+            self.folder_name = os.path.join(self.folder_name, "validation", "validation")
+
+        for label_folder in os.listdir(self.folder_name):
+            for file_name in os.listdir(os.path.join(self.folder_name, label_folder)):
+                full_file_name = os.path.join(self.folder_name, file_name)
+                self.files.append(full_file_name)
+                self.label_folders.append(classes[label_folder])
+
+    def __len__(self):
+        return len(self.files)
+
+    def __getitem__(self, idx):
+        img_path = self.files[idx]
+        image = Image.open(img_path).convert("rgb")
+        label = label_folders[idx]
+        if self.transform:
+            image = self.transform(image)
+
+        return image, label
+
+
+foo = CustomImageDataset("./archive", transform=preprocess, train=True)
 trainSet = torchvision.datasets.CIFAR100("./cifar", train = True, transform=preprocess, download=True)
 testSet = torchvision.datasets.CIFAR100("./cifar", train = False, transform=preprocess, download=True)
 
@@ -129,3 +171,4 @@ def find_loss(model: nn.Module, dataloader: DataLoader, loss_fn: nn.Module, devi
 
 if __name__ == '__main__':
     main()
+
