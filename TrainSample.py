@@ -37,7 +37,7 @@ class CustomImageDataset(Dataset):
         self.transform = transform
         self.train = train
         self.files = []
-        self.label_folders = []
+        self.labels = []
 
         if train == True:
             self.folder_name = os.path.join(self.folder_name, "train", "train")
@@ -46,26 +46,27 @@ class CustomImageDataset(Dataset):
 
         for label_folder in os.listdir(self.folder_name):
             for file_name in os.listdir(os.path.join(self.folder_name, label_folder)):
-                full_file_name = os.path.join(self.folder_name, file_name)
+                full_file_name = os.path.join(self.folder_name, label_folder, file_name)
                 self.files.append(full_file_name)
-                self.label_folders.append(classes[label_folder])
+                self.labels.append(classes[label_folder])
 
     def __len__(self):
         return len(self.files)
 
     def __getitem__(self, idx):
         img_path = self.files[idx]
-        image = Image.open(img_path).convert("rgb")
-        label = label_folders[idx]
+        image = Image.open(img_path).convert("RGB")
+        label = self.labels[idx]
         if self.transform:
             image = self.transform(image)
 
         return image, label
 
 
-foo = CustomImageDataset("./archive", transform=preprocess, train=True)
-trainSet = torchvision.datasets.CIFAR100("./cifar", train = True, transform=preprocess, download=True)
-testSet = torchvision.datasets.CIFAR100("./cifar", train = False, transform=preprocess, download=True)
+trainSet = CustomImageDataset("./archive", transform=preprocess, train=True)
+testSet = CustomImageDataset("./archive", transform=preprocess, train=False)
+# trainSet = torchvision.datasets.CIFAR100("./cifar", train = True, transform=preprocess, download=True)
+# testSet = torchvision.datasets.CIFAR100("./cifar", train = False, transform=preprocess, download=True)
 
 train_dataloader = DataLoader(trainSet, batch_size=batch_size, shuffle=False, num_workers=2)
 test_dataloader = DataLoader(testSet, batch_size=batch_size, shuffle=False, num_workers=2)
@@ -83,51 +84,12 @@ def main():
         model.load_state_dict(weights)
 
     for epoch in range(n_epochs):
-        # for i, (inputs, labels) in enumerate(train_dataloader):
-        #     y_pred = model(inputs.to(device))
-        #     y_label = torch.zeros_like(y_pred, device=device)
-        #     # print(f'len: {len(y_pred)}')
-        #     for j in range(len(y_pred)):
-        #         y_label[j, labels[j]] = 1
-
-        #     # print(f'i: {i}, inputs_shape: {inputs.shape}, labels_shape {labels.shape}, y_pref.shape: {y_pred.shape}, y_labels_shape {y_label.shape}, ')
-        #     loss = loss_fn(y_pred, y_label)
-        #     optimizer.zero_grad(set_to_none=True)
-        #     loss.backward()
-        #     optimizer.step()
-        #     if i % 100 == 0:
-        #         print(f'Epoch {epoch}, step {i}/{train_dataloader.__len__()}')
-        #     if i > 1000:
-        #         break
-
-        train_one_epoch(model, train_dataloader, loss_fn, optimizer, device)
-        
-        print(f'Finished epoch {epoch}, latest loss {loss}')
-
-        # with torch.no_grad():
-        #     loss = 0.0
-        #     for i, (inputs, labels) in enumerate(test_dataloader):
-        #         y_pred = model(inputs.to(device))
-        #         y_label = torch.zeros_like(y_pred)
-        #         for j in range(len(y_pred)):
-        #             y_label[j, labels[j]] = 1
-
-        #         loss += loss_fn(y_pred, y_label)
-        #         if i % 100 == 0:
-        #             print(f'Epoch {epoch}, test step {i}/{test_dataloader.__len__()}')
-        #         if i > 1000:
-        #             break
-        #     average_loss = loss / test_dataloader.__len__()
-
+        train_one_epoch(epoch, model, train_dataloader, loss_fn, optimizer, device)
         find_loss(model, test_dataloader, loss_fn, device)
-
-        print(f'average_loss {average_loss}')
-
         print(f'Saving to {SAVE_PATH}')
-        model.train()
         torch.save(model.state_dict(), SAVE_PATH)
 
-def train_one_epoch(model: nn.Module, dataloader: DataLoader, loss_fn: nn.Module, optimizer: optim.Optimizer, device: torch.device) -> float:
+def train_one_epoch(epoch: int, model: nn.Module, dataloader: DataLoader, loss_fn: nn.Module, optimizer: optim.Optimizer, device: torch.device) -> float:
     model.train()
     total_loss = 0.0
 
@@ -151,6 +113,11 @@ def train_one_epoch(model: nn.Module, dataloader: DataLoader, loss_fn: nn.Module
             print(f'Step {i}/{len(dataloader)}, Loss: {loss.item()}')
 
     average_loss = total_loss / len(dataloader)
+    
+    print(f'Finished epoch {epoch}, latest loss {average_loss}')
+
+    print(f'average_loss {average_loss}')
+    
     return average_loss
 
 def find_loss(model: nn.Module, dataloader: DataLoader, loss_fn: nn.Module, device: torch.device) -> float:
@@ -164,7 +131,7 @@ def find_loss(model: nn.Module, dataloader: DataLoader, loss_fn: nn.Module, devi
 
             loss += loss_fn(y_pred, y_label)
             if i % 100 == 0:
-                print(f'Epoch {epoch}, test step {i}/{test_dataloader.__len__()}')
+                print(f'Test step {i}/{test_dataloader.__len__()}')
         average_loss = loss / test_dataloader.__len__()
 
         return average_loss
