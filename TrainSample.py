@@ -68,8 +68,8 @@ testSet = CustomImageDataset("./archive", transform=preprocess, train=False)
 # trainSet = torchvision.datasets.CIFAR100("./cifar", train = True, transform=preprocess, download=True)
 # testSet = torchvision.datasets.CIFAR100("./cifar", train = False, transform=preprocess, download=True)
 
-train_dataloader = DataLoader(trainSet, batch_size=batch_size, shuffle=False, num_workers=2)
-test_dataloader = DataLoader(testSet, batch_size=batch_size, shuffle=False, num_workers=2)
+train_dataloader = DataLoader(trainSet, batch_size=batch_size, shuffle=True, num_workers=4)
+test_dataloader = DataLoader(testSet, batch_size=batch_size, shuffle=True, num_workers=4)
 
 def main():
     model = torchvision.models.densenet201(weights=None)
@@ -83,9 +83,8 @@ def main():
 
     # classify(model, ".\\archive\\train\\train\\CNV\\CNV-53264-1.jpeg", device)
 
-    find_accuracy(model, train_dataloader, device)
+    train(model, train_dataloader, test_dataloader, device)
 
-    #train(model, train_dataloader, test_dataloader, device)
 
 def classify(model: nn.Module, file_name: str, device: torch.device):
     im = Image.open(file_name).convert("RGB")
@@ -110,12 +109,15 @@ def train(model: nn.Module, train_dataloader: DataLoader, test_dataloader: DataL
     optimizer = optim.SGD(model.parameters(), lr=0.001)
 
     for epoch in range(n_epochs):
-        train_one_epoch(epoch, model, train_dataloader, loss_fn, optimizer, device)
-        find_loss(model, test_dataloader, loss_fn, device)
+        training_loss = train_one_epoch(model, train_dataloader, loss_fn, optimizer, device)
+        test_loss = find_loss(model, test_dataloader, loss_fn, device)
+        train_accurracy = find_accuracy(model, train_dataloader, device)
+        test_accurracy = find_accuracy(model, test_dataloader, device)
+        print(f'Epoch {epoch}, train acurracy: {train_accurracy*100}%, test accrracy: {test_accurracy*100}%, training loss: {training_loss}, test loss: {test_loss}')
         print(f'Saving to {SAVE_PATH}')
         torch.save(model.state_dict(), SAVE_PATH)
 
-def train_one_epoch(epoch: int, model: nn.Module, dataloader: DataLoader, loss_fn: nn.Module, optimizer: optim.Optimizer, device: torch.device) -> float:
+def train_one_epoch(model: nn.Module, dataloader: DataLoader, loss_fn: nn.Module, optimizer: optim.Optimizer, device: torch.device) -> float:
     model.train()
     total_loss = 0.0
 
@@ -135,15 +137,10 @@ def train_one_epoch(epoch: int, model: nn.Module, dataloader: DataLoader, loss_f
 
         total_loss += loss.item()
 
-        if i % 100 == 0:
-            print(f'Step {i}/{len(dataloader)}, Loss: {loss.item()}')
+        if i % 100 == 0 and i != 0:
+            print(f'  Step {i}/{len(dataloader)}, Loss: {loss.item()}')
 
-    average_loss = total_loss / len(dataloader)
-    
-    print(f'Finished epoch {epoch}, latest loss {average_loss}')
-
-    print(f'average_loss {average_loss}')
-    
+    average_loss = total_loss / len(dataloader)   
     return average_loss
 
 def find_loss(model: nn.Module, dataloader: DataLoader, loss_fn: nn.Module, device: torch.device) -> float:
@@ -156,14 +153,12 @@ def find_loss(model: nn.Module, dataloader: DataLoader, loss_fn: nn.Module, devi
                 y_label[j, labels[j]] = 1
 
             loss += loss_fn(y_pred, y_label)
-            if i % 100 == 0:
-                print(f'Test step {i}/{test_dataloader.__len__()}')
         average_loss = loss / test_dataloader.__len__()
 
         return average_loss
 
 def find_accuracy(model: nn.Module, dataloader: DataLoader, device: torch.device):
-    # model.eval()
+    model.eval()
     correct_predictions = 0
     total_samples = 0
 
@@ -183,10 +178,7 @@ def find_accuracy(model: nn.Module, dataloader: DataLoader, device: torch.device
 
             # correct_predictions += (predicted == labels).sum().item()
             # total_samples += labels.size(0)
-            print(f'Current acurracy: {correct_predictions}/{total_samples}')
-
         accuracy = correct_predictions / total_samples
-
     return accuracy
 
 if __name__ == '__main__':
