@@ -11,7 +11,7 @@ from torch.utils.data import DataLoader, Dataset
 from typing import Tuple
 from torchvision.io import read_image
 
-SAVE_PATH = "weights.pth"
+SAVE_PATH = "densenet201.pth"
 batch_size = 10
 n_epochs = 100
 
@@ -73,15 +73,41 @@ test_dataloader = DataLoader(testSet, batch_size=batch_size, shuffle=False, num_
 
 def main():
     model = torchvision.models.densenet201(weights=None)
-    model.to(device)
-    model.train()
-
-    loss_fn = nn.CrossEntropyLoss()
-    optimizer = optim.SGD(model.parameters(), lr=0.001)
 
     if os.path.exists(SAVE_PATH):
+        print(f'loading weights from {SAVE_PATH}')
         weights = torch.load(SAVE_PATH)
         model.load_state_dict(weights)
+
+    model.to(device)
+
+    # classify(model, ".\\archive\\train\\train\\CNV\\CNV-53264-1.jpeg", device)
+
+    find_accuracy(model, train_dataloader, device)
+
+    #train(model, train_dataloader, test_dataloader, device)
+
+def classify(model: nn.Module, file_name: str, device: torch.device):
+    im = Image.open(file_name).convert("RGB")
+    im = preprocess(im).unsqueeze(0).to(device)
+
+    model.eval()
+
+    with torch.no_grad():
+        output = model(im)
+        probabilities = torch.nn.functional.softmax(output, dim=1)
+        confidence, predicted_class = torch.max(probabilities, 1)
+    
+    class_names = list(classes.keys())
+    predicted_class_name = class_names[predicted_class.item()]
+
+    print(f'predicted_class_name {predicted_class_name} confidence.item {confidence.item()}')
+
+    return predicted_class_name, confidence.item()
+
+def train(model: nn.Module, train_dataloader: DataLoader, test_dataloader: DataLoader, device: torch.device):
+    loss_fn = nn.CrossEntropyLoss()
+    optimizer = optim.SGD(model.parameters(), lr=0.001)
 
     for epoch in range(n_epochs):
         train_one_epoch(epoch, model, train_dataloader, loss_fn, optimizer, device)
@@ -136,6 +162,32 @@ def find_loss(model: nn.Module, dataloader: DataLoader, loss_fn: nn.Module, devi
 
         return average_loss
 
+def find_accuracy(model: nn.Module, dataloader: DataLoader, device: torch.device):
+    # model.eval()
+    correct_predictions = 0
+    total_samples = 0
+
+    with torch.no_grad():
+        for _, (inputs, labels) in enumerate(dataloader, 0):
+            inputs = inputs.to(device)
+
+            # Perform inference
+            outputs = model(inputs).cpu()
+            for i in range(len(outputs)):
+                o = outputs[i]
+                l = labels[i]
+                total_samples += 1
+                if (torch.argmax(o).item() == l.item()):
+                    correct_predictions += 1
+            # _, predicted = torch.max(outputs, 1)
+
+            # correct_predictions += (predicted == labels).sum().item()
+            # total_samples += labels.size(0)
+            print(f'Current acurracy: {correct_predictions}/{total_samples}')
+
+        accuracy = correct_predictions / total_samples
+
+    return accuracy
+
 if __name__ == '__main__':
     main()
-
