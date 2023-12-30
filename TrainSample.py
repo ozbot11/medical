@@ -10,6 +10,7 @@ import torch.optim as optim
 from torch.utils.data import DataLoader, Dataset
 from typing import Tuple
 from torchvision.io import read_image
+from time import time
 
 SAVE_PATH = "densenet201.pth"
 batch_size = 10
@@ -68,8 +69,8 @@ testSet = CustomImageDataset("./archive", transform=preprocess, train=False)
 # trainSet = torchvision.datasets.CIFAR100("./cifar", train = True, transform=preprocess, download=True)
 # testSet = torchvision.datasets.CIFAR100("./cifar", train = False, transform=preprocess, download=True)
 
-train_dataloader = DataLoader(trainSet, batch_size=batch_size, shuffle=True, num_workers=4)
-test_dataloader = DataLoader(testSet, batch_size=batch_size, shuffle=True, num_workers=4)
+train_dataloader = DataLoader(trainSet, batch_size=batch_size, shuffle=True, num_workers=4, pin_memory_device = "cuda:0", pin_memory=True)
+test_dataloader = DataLoader(testSet, batch_size=batch_size, shuffle=True, num_workers=4, pin_memory_device = "cuda:0", pin_memory=True)
 
 def main():
     model = torchvision.models.densenet201(weights=None)
@@ -108,14 +109,20 @@ def train(model: nn.Module, train_dataloader: DataLoader, test_dataloader: DataL
     loss_fn = nn.CrossEntropyLoss()
     optimizer = optim.SGD(model.parameters(), lr=0.001)
 
+    prev_test_loss = find_loss(model, test_dataloader, loss_fn, device)
+    print(f'Starting test loss: {prev_test_loss}')
     for epoch in range(n_epochs):
+        start = time()
         training_loss = train_one_epoch(model, train_dataloader, loss_fn, optimizer, device)
+        end = time()
         test_loss = find_loss(model, test_dataloader, loss_fn, device)
         train_accurracy = find_accuracy(model, train_dataloader, device)
         test_accurracy = find_accuracy(model, test_dataloader, device)
-        print(f'Epoch {epoch}, train acurracy: {train_accurracy*100}%, test accrracy: {test_accurracy*100}%, training loss: {training_loss}, test loss: {test_loss}')
-        print(f'Saving to {SAVE_PATH}')
-        torch.save(model.state_dict(), SAVE_PATH)
+        print(f'Epoch {epoch}, train acurracy: {train_accurracy*100}%, test accuracy: {test_accurracy*100}%, training loss: {training_loss}, test loss: {test_loss}, time: {end-start}')
+        if test_loss < prev_test_loss:
+            print(f'Saving to {SAVE_PATH}')
+            torch.save(model.state_dict(), SAVE_PATH)
+            prev_test_loss = test_loss
 
 def train_one_epoch(model: nn.Module, dataloader: DataLoader, loss_fn: nn.Module, optimizer: optim.Optimizer, device: torch.device) -> float:
     model.train()
@@ -127,11 +134,11 @@ def train_one_epoch(model: nn.Module, dataloader: DataLoader, loss_fn: nn.Module
         optimizer.zero_grad(set_to_none=True)
 
         outputs = model(inputs)
-        y_label = torch.zeros_like(outputs, device=device)
+        y_label = torch.zeros_like(outputs)
         for j in range(len(outputs)):
             y_label[j, labels[j]] = 1
 
-        loss = loss_fn(outputs, y_label)
+        loss = loss_fn(outputs, y_label.to(device))
         loss.backward()
         optimizer.step()
 
