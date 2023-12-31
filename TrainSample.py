@@ -11,6 +11,7 @@ from torch.utils.data import DataLoader, Dataset
 from typing import Tuple
 from torchvision.io import read_image
 from time import time
+import argparse
 
 SAVE_PATH = "densenet201.pth"
 batch_size = 10
@@ -63,29 +64,11 @@ class CustomImageDataset(Dataset):
 
         return image, label
 
-
 trainSet = CustomImageDataset("./archive", transform=preprocess, train=True)
 testSet = CustomImageDataset("./archive", transform=preprocess, train=False)
-# trainSet = torchvision.datasets.CIFAR100("./cifar", train = True, transform=preprocess, download=True)
-# testSet = torchvision.datasets.CIFAR100("./cifar", train = False, transform=preprocess, download=True)
 
-train_dataloader = DataLoader(trainSet, batch_size=batch_size, shuffle=True, num_workers=4, pin_memory_device = "cuda:0", pin_memory=True)
-test_dataloader = DataLoader(testSet, batch_size=batch_size, shuffle=True, num_workers=4, pin_memory_device = "cuda:0", pin_memory=True)
-
-def main():
-    model = torchvision.models.densenet201(weights=None)
-
-    if os.path.exists(SAVE_PATH):
-        print(f'loading weights from {SAVE_PATH}')
-        weights = torch.load(SAVE_PATH)
-        model.load_state_dict(weights)
-
-    model.to(device)
-
-    # classify(model, ".\\archive\\train\\train\\CNV\\CNV-53264-1.jpeg", device)
-
-    train(model, train_dataloader, test_dataloader, device)
-
+train_dataloader = DataLoader(trainSet, batch_size=batch_size, shuffle=True, num_workers=4, pin_memory_device="cuda:0", pin_memory=True)
+test_dataloader = DataLoader(testSet, batch_size=batch_size, shuffle=True, num_workers=4, pin_memory_device="cuda:0", pin_memory=True)
 
 def classify(model: nn.Module, file_name: str, device: torch.device):
     im = Image.open(file_name).convert("RGB")
@@ -181,12 +164,40 @@ def find_accuracy(model: nn.Module, dataloader: DataLoader, device: torch.device
                 total_samples += 1
                 if (torch.argmax(o).item() == l.item()):
                     correct_predictions += 1
-            # _, predicted = torch.max(outputs, 1)
 
-            # correct_predictions += (predicted == labels).sum().item()
-            # total_samples += labels.size(0)
         accuracy = correct_predictions / total_samples
     return accuracy
+
+def main():
+    parser = argparse.ArgumentParser(description='Medical Image Classification')
+    parser.add_argument('mode', choices=['train', 'classify'], help='Mode: train or classify')
+    parser.add_argument('--file', help='Path to the image file (required for classify mode)')
+
+    args = parser.parse_args()
+
+    if args.mode == 'train':
+        model = torchvision.models.densenet201(weights=None)
+
+        if os.path.exists(SAVE_PATH):
+            print(f'loading weights from {SAVE_PATH}')
+            weights = torch.load(SAVE_PATH)
+            model.load_state_dict(weights)
+
+        model.to(device)
+        train(model, train_dataloader, test_dataloader, device)
+
+    elif args.mode == 'classify':
+        if args.file is None:
+            print("Error: --file is required for classify mode.")
+        else:
+            model = torchvision.models.densenet201(weights=None)
+            if os.path.exists(SAVE_PATH):
+                print(f'loading weights from {SAVE_PATH}')
+                weights = torch.load(SAVE_PATH)
+                model.load_state_dict(weights)
+
+            model.to(device)
+            classify(model, args.file, device)
 
 if __name__ == '__main__':
     main()
