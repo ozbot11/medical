@@ -12,7 +12,7 @@ from typing import Tuple
 from torchvision.io import read_image
 from time import time
 import argparse
-from dataset import CustomImageDataset
+from dataset import CustomImageDataset, classes
 
 SAVE_PATH = "densenet201.pth"
 batch_size = 10
@@ -27,8 +27,8 @@ preprocess = transforms.Compose([
     transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
 ])
 
-trainSet = CustomImageDataset("./archive", transform=preprocess, train=True)
-testSet = CustomImageDataset("./archive", transform=preprocess, train=False)
+trainSet = CustomImageDataset("./kermany/OCT2017", transform=preprocess, train=True)
+testSet = CustomImageDataset("./kermany/OCT2017", transform=preprocess, train=False)
 
 train_dataloader = DataLoader(trainSet, batch_size=batch_size, shuffle=True, num_workers=4, pin_memory_device="cuda:0", pin_memory=True)
 test_dataloader = DataLoader(testSet, batch_size=batch_size, shuffle=True, num_workers=4, pin_memory_device="cuda:0", pin_memory=True)
