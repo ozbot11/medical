@@ -5,7 +5,7 @@ import argparse
 import numpy as np
 
 from PIL import Image
-from dataset import CustomImageDataset
+from dataset import CustomImageDataset, classes
 from time import time
 from multiprocessing import freeze_support
 from typing import Tuple
@@ -42,8 +42,8 @@ preprocess = transforms.Compose([
     transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
 ])
 
-trainSet = CustomImageDataset("./archive", transform=preprocess, train=True)
-testSet = CustomImageDataset("./archive", transform=preprocess, train=False)
+trainSet = CustomImageDataset("./kermany/OCT2017", transform=preprocess, train=True)
+testSet = CustomImageDataset("./kermany/OCT2017", transform=preprocess, train=False)
 
 train_dataloader = DataLoader(trainSet, batch_size=batch_size, shuffle=True, num_workers=4, pin_memory=True)
 test_dataloader = DataLoader(testSet, batch_size=batch_size, shuffle=True, num_workers=4, pin_memory=True)
