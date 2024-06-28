@@ -19,9 +19,11 @@ class CustomImageDataset(Dataset):
         self.labels = []
 
         if train == True:
-            self.folder_name = os.path.join(self.folder_name, "train")
+            # incorrect: self.folder_name = os.path.join(self.folder_name, "train")
+            self.folder_name = os.path.join(self.folder_name, "train", "train")
         else:
-            self.folder_name = os.path.join(self.folder_name, "test")
+            # incorrect: self.folder_name = os.path.join(self.folder_name, "test")
+            self.folder_name = os.path.join(self.folder_name, "validation", "validation")
 
         for label_folder in os.listdir(self.folder_name):
             for file_name in os.listdir(os.path.join(self.folder_name, label_folder)):
