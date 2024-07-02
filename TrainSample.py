@@ -1,26 +1,17 @@
 import cv2
-import os
-import os.path
-import argparse
 import numpy as np
-
-from PIL import Image
-from dataset import CustomImageDataset, classes
-from time import time
-from multiprocessing import freeze_support
-from typing import Tuple
-
 import torch
-import torch.nn as nn
-import torch.optim as optim
-from torch.utils.data import DataLoader, Dataset
-
-import torchvision
-import torchvision.transforms as transforms
 import torch.nn.functional as F
 from torchvision.models import densenet201
 from torchvision import transforms
-from torchvision.io import read_image
+from torch.utils.data import DataLoader
+from PIL import Image
+from dataset import CustomImageDataset
+import torch.nn as nn
+import torch.optim as optim
+from time import time
+import argparse
+import os
 
 SAVE_PATH = "densenet201.pth"
 batch_size = 10
@@ -42,8 +33,11 @@ preprocess = transforms.Compose([
     transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
 ])
 
-trainSet = CustomImageDataset("./kermany/OCT2017", transform=preprocess, train=True)
-testSet = CustomImageDataset("./kermany/OCT2017", transform=preprocess, train=False)
+trainSet = CustomImageDataset("./archive", transform=preprocess, train=True)
+testSet = CustomImageDataset("./archive", transform=preprocess, train=False)
+
+# Does Not Work: trainSet = CustomImageDataset("./kermany/OCT2017", transform=preprocess, train=True)
+# Does Not Work: testSet = CustomImageDataset("./kermany/OCT2017", transform=preprocess, train=False)
 
 train_dataloader = DataLoader(trainSet, batch_size=batch_size, shuffle=True, num_workers=4, pin_memory=True)
 test_dataloader = DataLoader(testSet, batch_size=batch_size, shuffle=True, num_workers=4, pin_memory=True)
@@ -105,8 +99,8 @@ def classify(model: nn.Module, file_name: str, device: torch.device):
     predicted_class_name = class_names[predicted_class.item()]
 
     # Print the diagnosis before displaying the Grad-CAM
-    print(f'predicted_class_name {predicted_class_name} confidence.item {confidence.item()}')
-
+    print(f'Predicted Class: {predicted_class_name}')
+    print(f'Confidence: {confidence.item()}')
 
     target_layer = model.features.denseblock4
     overlay = grad_cam(model, im, target_layer)
@@ -117,7 +111,6 @@ def classify(model: nn.Module, file_name: str, device: torch.device):
     cv2.destroyAllWindows()
 
     return predicted_class_name, confidence.item()
-
 
 def train(model: nn.Module, train_dataloader: DataLoader, test_dataloader: DataLoader, device: torch.device):
     loss_fn = nn.CrossEntropyLoss()
